@@ -1,6 +1,4 @@
-Python 3.6.7 (v3.6.7:6ec5cf24b7, Oct 20 2018, 13:35:33) [MSC v.1900 64 bit (AMD64)] on win32
-Type "help", "copyright", "credits" or "license()" for more information.
->>> import torch
+import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
@@ -12,12 +10,17 @@ import pandas as pd
 from sklearn.metrics import accuracy_score, recall_score, precision_score, f1_score, roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import label_binarize
-from google.colab import drive
+import sys
 
-# Mount Google Drive
-drive.mount('/content/drive')
+# ========== Check Environment (Google Colab or Local) ==========
+if 'google.colab' in sys.modules:
+    from google.colab import drive
+    drive.mount('/content/drive')
+    base_path = "/content/drive/MyDrive/dataset/"
+else:
+    base_path = "./dataset/"  # Modify for local execution
 
-# Dataset class
+# ========== Dataset Class ==========
 class ImageDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
@@ -48,25 +51,25 @@ class ImageDataset(Dataset):
 
         return image, label
 
-# Transformations
+# ========== Transformations ==========
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 ])
 
-# Modified ResNet Model
+# ========== Modified ResNet Model ==========
 class ModifiedResNet(nn.Module):
     def __init__(self, num_classes):
         super(ModifiedResNet, self).__init__()
-        self.model = models.resnet50(pretrained=True)
+        self.model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)  # Fixes warning
         num_ftrs = self.model.fc.in_features
         self.model.fc = nn.Linear(num_ftrs, num_classes)
 
     def forward(self, x):
         return self.model(x)
 
-# Training Function
+# ========== Training Function ==========
 def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=10):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
@@ -141,17 +144,20 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, num_epoch
         history['val_recall'].append(val_recall)
         history['val_precision'].append(val_precision)
 
-        fpr, tpr, _ = roc_curve(
-            label_binarize(all_val_labels, classes=list(range(len(val_loader.dataset.classes)))).ravel(),
-            np.array(all_val_probs).ravel()
-        )
-        history['val_roc'].append((fpr, tpr))
+        try:
+            fpr, tpr, _ = roc_curve(
+                label_binarize(all_val_labels, classes=list(range(len(set(all_val_labels))))).ravel(),
+                np.array(all_val_probs).ravel()
+            )
+            history['val_roc'].append((fpr, tpr))
+        except ValueError:
+            print("Skipping ROC curve calculation due to single class in epoch.")
 
         print(f"Epoch {epoch + 1}/{num_epochs}, Val Acc: {val_acc:.4f}, Val F1: {val_f1:.4f}")
 
     return model, history
 
-# Plotting Function
+# ========== Plot Functions ==========
 def plot_metrics(history, metric_name, dataset_type):
     plt.figure(figsize=(10, 6))
     plt.plot(history[f'{dataset_type}_{metric_name}'], label=f'{dataset_type.capitalize()} {metric_name.capitalize()}')
@@ -174,15 +180,15 @@ def plot_roc_curves(history, dataset_type='train'):
     plt.legend()
     plt.show()
 
-# Datasets
+# ========== Define Datasets ==========
 datasets = {
     "FERPlus": {
-        "train": "/content/drive/MyDrive/dataset/FERPlus/train",
-        "val": "/content/drive/MyDrive/dataset/FERPlus/validation"
+        "train": os.path.join(base_path, "FERPlus/train"),
+        "val": os.path.join(base_path, "FERPlus/validation")
     },
     "CK": {
-        "train": "/content/drive/MyDrive/dataset/CK/train",
-        "val": "/content/drive/MyDrive/dataset/CK/validation"
+        "train": os.path.join(base_path, "CK/train"),
+        "val": os.path.join(base_path, "CK/validation")
     }
 }
 

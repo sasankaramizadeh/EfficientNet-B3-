@@ -185,11 +185,7 @@ datasets = {
     "FERPlus": {
         "train": os.path.join(base_path, "FERPlus/train"),
         "val": os.path.join(base_path, "FERPlus/validation")
-    },
-    "CK": {
-        "train": os.path.join(base_path, "CK/train"),
-        "val": os.path.join(base_path, "CK/validation")
-    }
+    } 
 }
 
 for dataset_name, paths in datasets.items():
